@@ -9,6 +9,12 @@ from multiprocessing import Process, Queue
 import torch.nn.functional as F
 from fogenv import FogToFogEnv
 import matplotlib.pyplot as plt
+"""
+Multi-Agent Proximal Policy Optimization (MAPPO) 核心实现
+适用场景：雾计算环境中的多智能体资源分配/任务调度优化
+功能：通过PPO算法优化多智能体的联合策略，最小化延迟、最大化资源利用率等
+"""
+
 
 # Device setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -63,11 +69,13 @@ class GaussianNoise:
         self.sigma = max(self.sigma * self.sigma_decay, self.sigma_min)  # Decay sigma
         return noise
 class MAPPOAgent:
+
     def __init__(self, state_dim, action_dim, agent_id):
+
         self.device = torch.device("cpu")
         self.actor = Actor(state_dim, action_dim).to(self.device)
         self.critic = Critic(state_dim).to(self.device)
-        
+
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=3e-4)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=3e-4)
         
@@ -151,7 +159,8 @@ def run_agent(agent_id, state_queue, action_queue, reward_queue, next_state_queu
 
 if __name__ == "__main__":
     mp.set_start_method('spawn', force=True)
-    output_dir = "/home/natnael/Desktop/mult-agentFog/output/MAPPO/"
+    # output_dir = "/home/natnael/Desktop/mult-agentFog/output/MAPPO/"
+    output_dir = "./output_lxl/MAPPO/"
     os.makedirs(output_dir, exist_ok=True)
     
     num_agents = 6
