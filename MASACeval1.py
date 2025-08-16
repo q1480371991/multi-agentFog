@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from fogenvfinal import FogToFogEnv
+from fogenv import FogToFogEnv
 from MASAC import SACAgent  # Use MASAC agent class
 import time
 

@@ -2,43 +2,44 @@ import torch
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from fogenvfinal import FogToFogEnv
+from fogenv import FogToFogEnv
 from MAPPO import MAPPOAgent  # Assuming this is your PPO agent implementation
 import time
 
 # Output directory for saving evaluation results
-output_dir = "/home/natnael/Desktop/mult-agentFog/output/MAPPO/"
+# output_dir = "/home/natnael/Desktop/mult-agentFog/output/MAPPO/"
+output_dir = "./output_lxl/MAPPO/"
 os.makedirs(output_dir, exist_ok=True)
 
 # Load trained agents
-num_agents = 6
-state_dim = 12  # Example: 6 fog nodes * (CPU + bandwidth)
-action_dim = 6  # 6 fog nodes
+num_agents = 6# 智能体数量（与训练时保持一致）
+state_dim = 12  # 状态维度（示例：6个雾节点 × 2个状态特征（CPU+带宽））
+action_dim = 6  # 动作维度（对应6个雾节点的任务分配策略）
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Specify the episode to load the models from
 last_episode = 10000  # You can change this to the episode number you want to evaluate
 max_action = 1  # Ensure this is correctly set based on your training setup
-
+# 初始化多智能体（与训练时的智能体结构一致）
 agents = [MAPPOAgent(state_dim, action_dim, i) for i in range(num_agents)]
 
-# Load the models for each agent
+# 为每个智能体加载训练好的模型参数
 for agent_id, agent in enumerate(agents):
-    actor_path = os.path.join(output_dir, f"actor_agent_{agent_id}_ep_{last_episode}.pth")
-    critic_path = os.path.join(output_dir, f"critic_agent_{agent_id}_ep_{last_episode}.pth")
+    actor_path = os.path.join(output_dir, f"weight/actor_agent_{agent_id}_ep_{last_episode}.pth")
+    critic_path = os.path.join(output_dir, f"weight/critic_agent_{agent_id}_ep_{last_episode}.pth")
     
-    # Load models if the files exist
+    # 加载策略网络参数（评估主要依赖策略网络生成动作）
     if os.path.exists(actor_path):
         agent.actor.load_state_dict(torch.load(actor_path, map_location=device))
     else:
         print(f"Actor model file not found: {actor_path}")
-
+    # 加载价值网络参数（评估中可能用于辅助分析，非必需）
     if os.path.exists(critic_path):
         agent.critic.load_state_dict(torch.load(critic_path, map_location=device))
     else:
         print(f"Critic model file not found: {critic_path}")
 
-# Initialize the environment
+# 初始化雾计算环境（与训练时的环境配置一致，确保评估场景一致）
 env = FogToFogEnv()
 num_episodes = 100
 success_count = 0
@@ -82,11 +83,11 @@ avg_reward = np.mean(evaluation_rewards)
 avg_energy = np.mean(evaluation_energy)
 
 # Save evaluation results
-np.save(f"{output_dir}/evaluation_rewards.npy", evaluation_rewards)
-np.save(f"{output_dir}/execution_latencies.npy", execution_latencies)
-np.save(f"{output_dir}/evaluation_energy.npy", evaluation_energy)
+np.save(f"{output_dir}result/evaluation_rewards.npy", evaluation_rewards)
+np.save(f"{output_dir}result/execution_latencies.npy", execution_latencies)
+np.save(f"{output_dir}result/evaluation_energy.npy", evaluation_energy)
 
-with open(f"{output_dir}/evaluation_metrics.txt", "w") as f:
+with open(f"{output_dir}result/evaluation_metrics.txt", "w") as f:
     f.write(f"Success Rate: {success_rate}\n")
     f.write(f"Average Execution Latency: {avg_latency}\n")
     f.write(f"Average Evaluation Reward: {avg_reward}\n")

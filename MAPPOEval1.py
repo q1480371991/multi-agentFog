@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from env import FogToFogEnv
+from fogenv import FogToFogEnv
 from MAPPO import MAPPOAgent  # Assuming this is your MAPPO agent implementation
 import time
 
@@ -132,6 +132,7 @@ plt.title("Evaluation Energy Consumption")
 # Adjust layout and save the plot
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, "evaluation_plots.png"))  # Save the full plot
+plt.show()
 plt.close()
 
 print("Evaluation complete. Results saved to", output_dir)

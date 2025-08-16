@@ -2,88 +2,110 @@ import numpy as np
 import torch
 
 class FogNode:
+    """雾节点类，模拟雾计算环境中的单个节点，包含节点的资源状态和任务处理能力"""
     def __init__(self, task_size, task_deadline, cpu_req, dep_prob, cpu_avail, ram_avail, queue_len, 
                  offload_succ_rate, bandwidth, net_delay, link_fail_prob, snr, plr, jitter, channel_status,
                  received_power=0.01, noise_power=0.001):
-        self.task_size = task_size
-        self.task_deadline = task_deadline
-        self.cpu_req = cpu_req
-        self.dep_prob = dep_prob
-        self.cpu_avail = cpu_avail
-        self.ram_avail = ram_avail
-        self.queue_len = queue_len
-        self.offload_succ_rate = offload_succ_rate
-        self.bandwidth = bandwidth
-        self.net_delay = net_delay
-        self.link_fail_prob = link_fail_prob
-        self.snr = self.calculate_snr(received_power, noise_power)
-        self.plr = plr
-        self.jitter = jitter
-        self.channel_status = channel_status  # 1: Free, 0: Busy
-        self.SPEED_OF_LIGHT_FIBER = 3e8
-        self.distance = torch.rand(1, device='cpu') * 90 + 10
+        # 任务相关属性
+        self.task_size = task_size # 任务数据大小
+        self.task_deadline = task_deadline# 任务截止时间
+        self.cpu_req = cpu_req# 任务CPU需求
+        self.dep_prob = dep_prob# 任务依赖概率
+
+        # 节点资源属性
+        self.cpu_avail = cpu_avail# 可用CPU资源
+        self.ram_avail = ram_avail# 可用内存资源
+        self.queue_len = queue_len# 任务队列长度
+        self.offload_succ_rate = offload_succ_rate # 任务卸载成功率
+        self.bandwidth = bandwidth# 可用带宽
+        self.net_delay = net_delay # 网络延迟
+
+        # 链路属性
+        self.link_fail_prob = link_fail_prob# 链路失败概率
+        self.snr = self.calculate_snr(received_power, noise_power) # 信噪比
+        self.plr = plr# 分组丢失率
+        self.jitter = jitter # 抖动
+        self.channel_status = channel_status   # 信道状态（1:空闲，0:繁忙）
+
+        # 物理参数
+        self.SPEED_OF_LIGHT_FIBER = 3e8# 光纤中光速
+        self.distance = torch.rand(1, device='cpu') * 90 + 10# 随机生成节点间距离（10-100单位）
 
     def calculate_snr(self, received_power, noise_power):
+        """计算信噪比（线性值）"""
         return received_power / noise_power
 
     def calculate_snr_db(self, received_power, noise_power):
+        """计算信噪比（分贝值）"""
         return 10 * np.log10(received_power / noise_power)
 
     def can_handle_task(self, task_cpu, task_bandwidth, task_ram):
-        return (self.cpu_avail >= task_cpu and
-                self.bandwidth >= task_bandwidth and
-                self.ram_avail >= task_ram)
+        """判断节点是否有足够资源处理任务"""
+        return (self.cpu_avail >= task_cpu and# CPU足够
+                self.bandwidth >= task_bandwidth and # 带宽足够
+                self.ram_avail >= task_ram)# 内存足够
 
     def assign_task(self, task_cpu, task_bandwidth, task_ram):
+        """为节点分配任务，消耗相应资源"""
         if self.can_handle_task(task_cpu, task_bandwidth, task_ram):
-            self.cpu_avail -= task_cpu
-            self.bandwidth -= task_bandwidth
-            self.ram_avail -= task_ram
+            self.cpu_avail -= task_cpu# 减少可用CPU
+            self.bandwidth -= task_bandwidth# 减少可用带宽
+            self.ram_avail -= task_ram# 减少可用内存
             return True
         return False
     
     def reset(self):
-        self.cpu_avail = 3.0  # Reset to initial capacity
-        self.bandwidth = 100   # Reset to initial bandwidth
-        self.ram_avail = 2.0   # Reset to initial RAM
+        """重置节点资源到初始状态"""
+        self.cpu_avail = 3.0  # 重置CPU容量
+        self.bandwidth = 100   # 重置带宽
+        self.ram_avail = 2.0   # 重置内存
 
     def calculate_pd(self, distance):
+        """计算传播延迟（基于距离和光速）"""
         return distance / self.SPEED_OF_LIGHT_FIBER
 
     def calculate_transmission_latency(self, task_size, bandwidth, distance):
-        pd = self.calculate_pd(distance)
-        return task_size / bandwidth + pd
+        """计算传输延迟 = 传输时间 + 传播延迟"""
+        pd = self.calculate_pd(distance)# 传播延迟
+        return task_size / bandwidth + pd# 传输时间（数据量/带宽）+ 传播延迟
 
 
 class FogToFogEnv:
+    """雾到雾计算环境类，模拟多雾节点之间的任务分配和资源管理"""
     def __init__(self, num_fog_nodes=6, arrival_rate=3 * 10**3, task_execution_rate=2.0):
-        self.num_fog_nodes = num_fog_nodes
-        self.arrival_rate = arrival_rate  # Task arrival rate (lambda)
-        self.task_execution_rate = task_execution_rate  # Task execution rate (tasks per unit time)
+        self.num_fog_nodes = num_fog_nodes# 雾节点数量
+        self.arrival_rate = arrival_rate  # 任务到达率（泊松分布参数）
+        self.task_execution_rate = task_execution_rate #任务执行率（单位时间处理任务数）
+        # 初始化雾节点列表（参数为初始默认值）
         self.fog_nodes = [FogNode(0, 0, 0, 0, 3.0, 2.0, 4, 0.8, 100, 30, 0.02, 1.0, 0.01, 1.0, 1) for _ in range(num_fog_nodes)]
-        self.task_counter = 0
-        self.result_ratio = 0.1
-        self.state = self._generate_initial_state()
-        self.max_latency = 100  # Placeholder max latency
-        self.max_energy = 10  # Placeholder max energy
-        self.max_successful_tasks = 10  # Placeholder max successful tasks
+        self.task_counter = 0# 任务计数器
+        self.result_ratio = 0.1# 任务结果数据量与原任务的比例
+        self.state = self._generate_initial_state() # 初始状态
+        # 评估指标的最大值（用于归一化）
+        self.max_latency = 100  # 最大延迟阈值（占位符）
+        self.max_energy = 10  # 最大能量消耗阈值（占位符）
+        self.max_successful_tasks = 10   #最大成功任务数阈值（占位符）
+        # 奖励平滑参数
         self.smoothed_reward = 0
-        self.previous_energy = 0  # Initialize previous energy for smoothing
+        self.previous_energy = 0  # 用于能量平滑的历史值
 
     def _generate_initial_state(self):
-        self.S_channel = np.random.choice([0, 1], size=(self.num_fog_nodes,))
-        self.S_power = np.random.normal(3.0, 0.5, size=(self.num_fog_nodes,))
-        self.S_gain = np.random.normal(1.0, 0.2, size=(self.num_fog_nodes,))
-        self.S_size = np.random.normal(25, 10, size=(self.num_fog_nodes,))
-        self.S_cycle = np.random.normal(3.0, 0.5, size=(self.num_fog_nodes,))
-        self.S_ddl = np.random.normal(25, 10, size=(self.num_fog_nodes,))
-        self.S_res = np.random.normal(2.0, 0.5, size=(self.num_fog_nodes,))
-        self.S_com = np.random.normal(100, 20, size=(self.num_fog_nodes,))
-        self.S_epsilon = np.random.normal(0.01, 0.005, size=(self.num_fog_nodes,))
-        self.S_new_feature1 = np.random.normal(1.0, 0.2, size=(self.num_fog_nodes,))
-        self.S_new_feature2 = np.random.normal(1.0, 0.2, size=(self.num_fog_nodes,))
-        self.S_new_feature3 = np.random.normal(1.0, 0.2, size=(self.num_fog_nodes,))
-        
+        """生成环境初始状态，包含每个雾节点的12个特征"""
+        # 生成各特征的随机初始值（基于正态分布或离散选择）
+        self.S_channel = np.random.choice([0, 1], size=(self.num_fog_nodes,)) # 信道状态（0/1）
+        self.S_power = np.random.normal(3.0, 0.5, size=(self.num_fog_nodes,))# 功率
+        self.S_gain = np.random.normal(1.0, 0.2, size=(self.num_fog_nodes,)) # 增益
+        self.S_size = np.random.normal(25, 10, size=(self.num_fog_nodes,))# 任务大小
+        self.S_cycle = np.random.normal(3.0, 0.5, size=(self.num_fog_nodes,))# 周期
+        self.S_ddl = np.random.normal(25, 10, size=(self.num_fog_nodes,)) # 截止时间
+        self.S_res = np.random.normal(2.0, 0.5, size=(self.num_fog_nodes,)) # 资源
+        self.S_com = np.random.normal(100, 20, size=(self.num_fog_nodes,)) # 通信能力
+        self.S_epsilon = np.random.normal(0.01, 0.005, size=(self.num_fog_nodes,))# 小参数
+        self.S_new_feature1 = np.random.normal(1.0, 0.2, size=(self.num_fog_nodes,))# 新特征1
+        self.S_new_feature2 = np.random.normal(1.0, 0.2, size=(self.num_fog_nodes,))# 新特征2
+        self.S_new_feature3 = np.random.normal(1.0, 0.2, size=(self.num_fog_nodes,))# 新特征3
+
+        # 组合所有特征，形成每个节点的状态向量（12维）
         return np.array([
         [self.S_channel[n], self.S_power[n], self.S_gain[n], self.S_size[n], self.S_cycle[n],
          self.S_ddl[n], self.S_res[n], self.S_com[n], self.S_epsilon[n],
@@ -92,84 +114,103 @@ class FogToFogEnv:
         ])
 
     def calculate_reward(self, total_latency, total_energy, successful_tasks):
-        latency_penalty_factor = 0.6
-        energy_penalty_factor = 0.18
-        success_reward_factor = 0.3
-        smoothed_energy = self.smooth_energy(total_energy)
-        latency_penalty = np.log1p(total_latency) * latency_penalty_factor if total_latency > self.max_latency else 1
-        energy_penalty = np.log1p(smoothed_energy) * energy_penalty_factor
-        task_success_bonus = success_reward_factor * (successful_tasks / self.max_successful_tasks)
+        """计算奖励值，综合考虑延迟、能量和任务成功率"""
+        # 奖励因子（权重）
+        latency_penalty_factor = 0.6# 延迟惩罚权重
+        energy_penalty_factor = 0.18# 能量惩罚权重
+        success_reward_factor = 0.3# 成功任务奖励权重
 
+        # 能量平滑（减少波动）
+        smoothed_energy = self.smooth_energy(total_energy)
+        # 延迟惩罚（超过阈值时惩罚增大）
+        latency_penalty = np.log1p(total_latency) * latency_penalty_factor if total_latency > self.max_latency else 1
+        # 能量惩罚
+        energy_penalty = np.log1p(smoothed_energy) * energy_penalty_factor
+        # 任务成功奖励
+        task_success_bonus = success_reward_factor * (successful_tasks / self.max_successful_tasks)
+        # 综合奖励计算（加权组合）
         reward = 0.4 * task_success_bonus + 0.2 * latency_penalty + 0.1 * energy_penalty
+        # 奖励平滑（指数移动平均）
         self.smoothed_reward = 0.90 * self.smoothed_reward + 0.1 * reward
-        
+        # 奖励裁剪到[-1, 1]范围
         return np.clip(self.smoothed_reward, -1, 1)
 
     def smooth_energy(self, current_energy, smoothing_factor=0.1):
-        # Apply exponential smoothing to the energy values to reduce fluctuations
+        """对能量消耗进行指数平滑，减少瞬时波动"""
         smoothed_energy = smoothing_factor * current_energy + (1 - smoothing_factor) * self.previous_energy
-        self.previous_energy = smoothed_energy  # Update previous energy for the next step
+        self.previous_energy = smoothed_energy   # 更新历史值
         return smoothed_energy
 
     def reset(self):
-        self.task_counter = 0
+        """重置环境到初始状态"""
+        self.task_counter = 0# 重置任务计数器
         for node in self.fog_nodes:
-            node.reset()
-        self.previous_energy = 0  # Reset previous energy for smoothing
-        return self._generate_initial_state()
+            node.reset()# 重置所有雾节点资源
+        self.previous_energy = 0  # 重置能量平滑历史值
+        return self._generate_initial_state()# 返回新的初始状态
 
     def step(self, actions):
+        """执行一步环境交互，处理任务分配和资源更新"""
+        # 随机生成任务需求参数（CPU、带宽、内存、大小）
         task_cpu, task_bandwidth, task_ram, task_size = np.random.uniform(0.5, 2.0, 4)
-        self.task_counter += 1
+        self.task_counter += 1# 任务计数+1
 
-        # Simulate task arrivals based on lambda (Poisson distribution)
+        # 基于泊松分布生成到达的任务数量
         num_tasks_arrived = np.random.poisson(self.arrival_rate)
 
-        # If no tasks arrived, skip the step
+        # 若没有任务到达，直接返回当前状态
         if num_tasks_arrived == 0:
             return self.state, 0, False, {}
-
+        # 处理动作：裁剪到[0,1]范围，归一化得到卸载概率
         actions = np.clip(np.array(actions).flatten(), 0, 1)
         action_sum = np.sum(actions)
         offloading_probabilities = actions / action_sum if action_sum > 0 else np.ones_like(actions) / len(actions)
-
+        # 初始化评估指标
         total_latency, total_energy, successful_tasks = 0, 0, 0
 
-        # Calculate task execution rate (tasks processed per time unit based on available resources)
+        # 计算任务执行率（基于可用资源的处理能力）
         task_execution_rate = min(self.task_execution_rate, self.fog_nodes[0].cpu_avail)
 
-        # Task execution and offloading loop
-        local_cpu = task_cpu * max(0, 1 - np.sum(offloading_probabilities))  # Ensure non-negative
+        # 计算本地处理的任务资源需求（扣除卸载部分）
+        local_cpu = task_cpu * max(0, 1 - np.sum(offloading_probabilities))  # 确保非负
         local_bandwidth = task_bandwidth * max(0, 1 - np.sum(offloading_probabilities))
         local_ram = task_ram * max(0, 1 - np.sum(offloading_probabilities))
 
+        # 处理本地任务（第0个节点）
         if self.fog_nodes[0].can_handle_task(local_cpu, local_bandwidth, local_ram):
-            self.fog_nodes[0].assign_task(local_cpu, local_bandwidth, local_ram)
+            self.fog_nodes[0].assign_task(local_cpu, local_bandwidth, local_ram) # 分配资源
             
-            # Recalculate available CPU after assignment
-            available_cpu = self.fog_nodes[0].cpu_avail + local_cpu  # Adjusted available CPU
-
-            total_latency += local_cpu / max(available_cpu, 1e-6)  # Prevent division by zero
-            total_energy += available_cpu * local_cpu * 1e9  # Corrected energy calculation
-            successful_tasks += 1
-
+            # Recalculate available CPU after assignment  计算本地任务的延迟和能量消耗
+            available_cpu = self.fog_nodes[0].cpu_avail + local_cpu  # 调整后的可用CPU
+            total_latency += local_cpu / max(available_cpu, 1e-6)  # 避免除零错误
+            total_energy += available_cpu * local_cpu * 1e9  # Corrected energy calculation 能量计算
+            successful_tasks += 1# 本地任务成功计数
+            # 处理卸载到其他节点的任务
             for i in range(self.num_fog_nodes):
+                # 若有卸载概率且信道空闲
                 if offloading_probabilities[i] > 0 and self.fog_nodes[i].channel_status == 1:
+                    # 计算执行延迟（任务CPU需求/节点可用CPU）
                     execution_latency = task_cpu / max(self.fog_nodes[i].cpu_avail, 1e-6)
+                    # 计算传输延迟（任务传输+结果回传）
                     transmission_latency = self.fog_nodes[i].calculate_transmission_latency(task_size, self.fog_nodes[i].bandwidth, self.fog_nodes[i].distance.item())
                     result_transmission_latency = self.fog_nodes[i].calculate_transmission_latency(task_size * self.result_ratio, self.fog_nodes[i].bandwidth, self.fog_nodes[i].distance.item())
 
+                    # 总任务延迟取各部分最大值
                     total_task_latency = transmission_latency + execution_latency + result_transmission_latency
                     total_latency = max(total_latency, total_task_latency)  # Take the max latency
 
+                    # 计算传输和执行的能量消耗
                     transmission_energy = transmission_latency * self.fog_nodes[i].bandwidth * 1e-9
                     execution_energy = execution_latency * self.fog_nodes[i].cpu_avail * 1e-9
                     total_energy += transmission_energy + execution_energy
                     
-                    successful_tasks += 1
-
+                    successful_tasks += 1# 卸载任务成功计数
+        # 计算奖励
         reward = self.calculate_reward(total_latency, total_energy, successful_tasks)
+        # 判断回合是否结束（任务数达到100）
         done = self.task_counter >= 100
+        # 生成下一状态
         next_state = self._generate_initial_state()
+        # 打包信息（奖励、延迟、能量、成功任务数）
         info = {"Reward": reward, "Total Latency": total_latency, "Total Energy": total_energy, "Successful Tasks": successful_tasks}
         return next_state, reward, done, info

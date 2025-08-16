@@ -151,7 +151,8 @@ if __name__ == "__main__":
     multiprocessing.set_start_method('spawn', force=True)
     print("Using device: CPU")
 
-    output_dir = "/home/natnael/Desktop/mult-agentFog/output/MASAC/"
+    # output_dir = "/home/natnael/Desktop/mult-agentFog/output/MASAC/"
+    output_dir = "./output_lxl/MASAC/"
     os.makedirs(output_dir, exist_ok=True)
 
     num_agents = 6
@@ -206,11 +207,13 @@ if __name__ == "__main__":
         print(f"Episode {episode+1}, Total Reward: {episode_reward}, Total Latency: {episode_latency}, Total Energy: {episode_energy}, Successful Tasks: {episode_successful}")
 
                 # Save models periodically
-        if (episode + 1) % 100 == 0:
+        # if (episode + 1) % 100 == 0:
+        # 只保存最后一轮的模型
+        if episode + 1 == num_episodes:
             for agent_id, agent in enumerate(agents):
-                torch.save(agent.actor.state_dict(), os.path.join(output_dir, f"actor_agent_{agent_id}_ep_{episode+1}.pth"))
-                torch.save(agent.critic1.state_dict(), os.path.join(output_dir, f"critic1_agent_{agent_id}_ep_{episode+1}.pth"))
-                torch.save(agent.critic2.state_dict(), os.path.join(output_dir, f"critic2_agent_{agent_id}_ep_{episode+1}.pth"))
+                torch.save(agent.actor.state_dict(), os.path.join(output_dir, f"weight/actor_agent_{agent_id}_ep_{episode+1}.pth"))
+                torch.save(agent.critic1.state_dict(), os.path.join(output_dir, f"weight/critic1_agent_{agent_id}_ep_{episode+1}.pth"))
+                torch.save(agent.critic2.state_dict(), os.path.join(output_dir, f"weight/critic2_agent_{agent_id}_ep_{episode+1}.pth"))
 
             print(f"Models saved at episode {episode+1}")
 
@@ -219,8 +222,8 @@ if __name__ == "__main__":
         p.join()
 
     metrics = {"episode_rewards": episode_rewards, "episode_latencies": episode_latencies, "episode_energies": episode_energies, "episode_successful_Tasks": episode_successful_Tasks}
-    np.save(os.path.join(output_dir, "training_metrics.npy"), metrics)
-    print(f"Training metrics saved to {output_dir}/training_metrics.npy")
+    np.save(os.path.join(output_dir, "train/training_metrics.npy"), metrics)
+    print(f"Training metrics saved to {output_dir}train/training_metrics.npy")
 
     plt.plot(episode_rewards)
     plt.title("Episode Rewards")
