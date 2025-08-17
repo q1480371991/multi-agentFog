@@ -83,11 +83,11 @@ avg_reward = np.mean(evaluation_rewards)
 avg_energy = np.mean(evaluation_energy)
 
 # Save evaluation results
-np.save(f"{output_dir}result/evaluation_rewards.npy", evaluation_rewards)
-np.save(f"{output_dir}result/execution_latencies.npy", execution_latencies)
-np.save(f"{output_dir}result/evaluation_energy.npy", evaluation_energy)
+np.save(f"{output_dir}evaluate/evaluation_rewards.npy", evaluation_rewards)
+np.save(f"{output_dir}evaluate/execution_latencies.npy", execution_latencies)
+np.save(f"{output_dir}evaluate/evaluation_energy.npy", evaluation_energy)
 
-with open(f"{output_dir}result/evaluation_metrics.txt", "w") as f:
+with open(f"{output_dir}evaluate/evaluation_metrics.txt", "w") as f:
     f.write(f"Success Rate: {success_rate}\n")
     f.write(f"Average Execution Latency: {avg_latency}\n")
     f.write(f"Average Evaluation Reward: {avg_reward}\n")
@@ -122,7 +122,7 @@ plt.title("Evaluation Energy Consumption")
 
 # Adjust layout and save the plot
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, "evaluation_plots.png"))  # Save the full plot
+plt.savefig(os.path.join(output_dir, "evaluate/evaluation_plots.png"))  # Save the full plot
 plt.close()
 
 print("Evaluation complete. Results saved to", output_dir)
