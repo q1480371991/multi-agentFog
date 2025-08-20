@@ -1,4 +1,0 @@
-Success Rate: 1.0
-Average Execution Latency: 0.3582782220840454
-Average Evaluation Reward: 0.31942221005288046
-Average Evaluation Energy: 0.8310813056848657

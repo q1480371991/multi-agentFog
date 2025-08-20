@@ -1,0 +1,5 @@
+=== MASAC Evaluation Summary ===
+Success Rate: 1.00
+Average Reward: 0.32 ¡À 0.01
+Average Latency: 0.21 ¡À 0.01
+Average Energy: 1.00 ¡À 0.15

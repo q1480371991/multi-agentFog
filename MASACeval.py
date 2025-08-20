@@ -97,7 +97,7 @@ avg_energy = np.mean(evaluation_energy)# 平均能量消耗
 
 # 保存评估结果（以numpy数组形式，便于后续分析）
 np.save(f"{output_dir}evaluate/evaluation_rewards.npy", evaluation_rewards)
-np.save(f"{output_dir}evaluate/execution_latencies.npy", execution_latencies)
+np.save(f"{output_dir}evaluate/evaluation_latencies.npy", execution_latencies)
 np.save(f"{output_dir}evaluate/evaluation_energy.npy", evaluation_energy)
 # 将评估指标保存到文本文件（便于直接查看）
 with open(f"{output_dir}evaluate/evaluation_metrics.txt", "w") as f:

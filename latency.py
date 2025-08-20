@@ -1,25 +1,27 @@
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-
+# 对比不同算法的延迟数据并可视化
 # Base path and models to evaluate
-base_path = "/home/natnael/Desktop/mult-agentFog/output/"
+# base_path = "/home/natnael/Desktop/mult-agentFog/output/"
+base_path = "./output_lxl/"
 models = ["MATD3", "MAPPO", "MASAC", "MAIDDPG"]
 
 # Containers for valid data
 valid_models = []
+# 初始化各模型的延迟数据字典（键为模型名，值为延迟列表）
 episode_latencies = {"MATD3": [], "MAPPO": [], "MASAC": [], "MAIDDPG": []}
 
-# Function to safely load .npy latency metrics
+# Function to safely load .npy latency metrics 加载.npy格式延迟数据的函数
 def load_latency(directory):
     try:
-        latencies = np.load(os.path.join(directory, "evaluation_latencies.npy"))
+        latencies = np.load(os.path.join(directory, "evaluate/evaluation_latencies.npy"))
     except FileNotFoundError as e:
         print(f"⚠️  Missing file: {e.filename}. Skipping {directory}.")
         return None
     return latencies
 
-# Iterate over models and load latency data
+# Iterate over models and load latency data 遍历模型并加载延迟数据
 for model in models:
     metrics_dir = os.path.join(base_path, model)
     latencies = load_latency(metrics_dir)
@@ -28,7 +30,7 @@ for model in models:
         continue  # Skip if file is missing
     
     valid_models.append(model)
-    episode_latencies[model] = latencies
+    episode_latencies[model] = latencies# 存储延迟数据
 
 # Plot only latency
 if valid_models:
@@ -44,7 +46,7 @@ if valid_models:
     plt.legend()
     plt.grid(True)
 
-    save_path = os.path.join(base_path, "latency_comparison_plot.png")
+    save_path = os.path.join(base_path, "origin/latency_comparison_plot.png")
     plt.tight_layout()
     plt.savefig(save_path)
     plt.show()

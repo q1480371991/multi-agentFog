@@ -115,7 +115,7 @@ def run_agent(agent_id, state_q, action_q, reward_q, next_state_q, done_q, agent
 if __name__ == "__main__":
     mp.set_start_method('spawn', force=True) # 设置多进程启动方式
     # output_dir = "/home/natnael/Desktop/mult-agentFog/output/MAIDDPG/"
-    output_dir = "./output_lxl/MAIDDPG/weight/"
+    output_dir = "./output_lxl/MAIDDPG/"
     os.makedirs(output_dir, exist_ok=True)
 
     # 环境和智能体配置
@@ -183,17 +183,17 @@ if __name__ == "__main__":
         # if (episode + 1) % 100 == 0 or episode + 1 == num_episodes:
         if  episode + 1 == num_episodes:
             for agent_id, agent in enumerate(agents):
-                torch.save(agent.actor.state_dict(), os.path.join(output_dir, f"actor_agent_{agent_id}_ep_{episode+1}.pth"))
-                torch.save(agent.critic.state_dict(), os.path.join(output_dir, f"critic_agent_{agent_id}_ep_{episode+1}.pth"))
+                torch.save(agent.actor.state_dict(), os.path.join(output_dir, f"weight/actor_agent_{agent_id}_ep_{episode+1}.pth"))
+                torch.save(agent.critic.state_dict(), os.path.join(output_dir, f"weight/critic_agent_{agent_id}_ep_{episode+1}.pth"))
             print(f"Models saved at episode {episode+1}")
     # 保存训练指标为numpy文件
-    np.save(os.path.join(output_dir, "training_metrics.npy"), {
+    np.save(os.path.join(output_dir, "train/training_metrics.npy"), {
         "episode_rewards": episode_rewards,
         "episode_latencies": episode_latencies,
         "episode_energies": episode_energies,
         "episode_successful": episode_successful_Tasks
     })
-    print(f"Training metrics saved to {output_dir}/training_metrics.npy")
+    print(f"Training metrics saved to {output_dir}/train/training_metrics.npy")
 
     # 绘制训练指标图表
     plt.figure(figsize=(15, 10))

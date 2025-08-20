@@ -2,7 +2,10 @@ import numpy as np
 import torch
 
 class FogNode:
-    """雾节点类，模拟雾计算环境中的单个节点，包含节点的资源状态和任务处理能力"""
+    """雾节点类，模拟雾计算环境中的单个节点实体
+    该类封装了雾节点的硬件资源（CPU、内存、带宽）、通信属性（信噪比、链路质量）
+    和任务处理能力，提供资源检查、任务分配、延迟计算等核心功能，是构建多节点环境的基础单元。
+    """
     def __init__(self, task_size, task_deadline, cpu_req, dep_prob, cpu_avail, ram_avail, queue_len, 
                  offload_succ_rate, bandwidth, net_delay, link_fail_prob, snr, plr, jitter, channel_status,
                  received_power=0.01, noise_power=0.001):
@@ -10,21 +13,21 @@ class FogNode:
         self.task_size = task_size # 任务数据大小
         self.task_deadline = task_deadline# 任务截止时间
         self.cpu_req = cpu_req# 任务CPU需求
-        self.dep_prob = dep_prob# 任务依赖概率
+        self.dep_prob = dep_prob# 任务依赖其他任务的概率（影响调度）
 
         # 节点资源属性
         self.cpu_avail = cpu_avail# 可用CPU资源
         self.ram_avail = ram_avail# 可用内存资源
         self.queue_len = queue_len# 任务队列长度
-        self.offload_succ_rate = offload_succ_rate # 任务卸载成功率
+        self.offload_succ_rate = offload_succ_rate  # 任务卸载成功率（卸载到其他节点的成功率）
         self.bandwidth = bandwidth# 可用带宽
-        self.net_delay = net_delay # 网络延迟
+        self.net_delay = net_delay # 基础网络延迟（固定通信延迟）
 
         # 链路属性
-        self.link_fail_prob = link_fail_prob# 链路失败概率
-        self.snr = self.calculate_snr(received_power, noise_power) # 信噪比
-        self.plr = plr# 分组丢失率
-        self.jitter = jitter # 抖动
+        self.link_fail_prob = link_fail_prob# 链路失败概率（通信中断的可能性）
+        self.snr = self.calculate_snr(received_power, noise_power) # 信噪比（通信质量指标）
+        self.plr = plr# 分组丢失率（数据传输中数据包丢失比例）
+        self.jitter = jitter  # 抖动（延迟变化量，影响实时性）
         self.channel_status = channel_status   # 信道状态（1:空闲，0:繁忙）
 
         # 物理参数
@@ -32,21 +35,21 @@ class FogNode:
         self.distance = torch.rand(1, device='cpu') * 90 + 10# 随机生成节点间距离（10-100单位）
 
     def calculate_snr(self, received_power, noise_power):
-        """计算信噪比（线性值）"""
+        """计算信噪比（线性值）   信噪比 = 接收功率 / 噪声功率，值越大表示通信质量越好"""
         return received_power / noise_power
 
     def calculate_snr_db(self, received_power, noise_power):
-        """计算信噪比（分贝值）"""
+        """计算信噪比（分贝值） 分贝值信噪比 = 10 * log10(接收功率 / 噪声功率)，便于直观理解增益  """
         return 10 * np.log10(received_power / noise_power)
 
     def can_handle_task(self, task_cpu, task_bandwidth, task_ram):
-        """判断节点是否有足够资源处理任务"""
+        """判断节点是否有足够资源处理任务  检查当前可用CPU、带宽和内存是否满足任务需求，返回布尔值"""
         return (self.cpu_avail >= task_cpu and# CPU足够
                 self.bandwidth >= task_bandwidth and # 带宽足够
                 self.ram_avail >= task_ram)# 内存足够
 
     def assign_task(self, task_cpu, task_bandwidth, task_ram):
-        """为节点分配任务，消耗相应资源"""
+        """为节点分配任务，消耗相应资源 若资源充足则分配任务并扣减资源，返回分配成功与否的标志"""
         if self.can_handle_task(task_cpu, task_bandwidth, task_ram):
             self.cpu_avail -= task_cpu# 减少可用CPU
             self.bandwidth -= task_bandwidth# 减少可用带宽
@@ -61,27 +64,33 @@ class FogNode:
         self.ram_avail = 2.0   # 重置内存
 
     def calculate_pd(self, distance):
-        """计算传播延迟（基于距离和光速）"""
+        """计算传播延迟（基于距离和光速） 传播延迟 = 距离 / 光速"""
         return distance / self.SPEED_OF_LIGHT_FIBER
 
     def calculate_transmission_latency(self, task_size, bandwidth, distance):
         """计算传输延迟 = 传输时间 + 传播延迟"""
-        pd = self.calculate_pd(distance)# 传播延迟
+        pd = self.calculate_pd(distance)# 传播延迟 传播延迟 = 距离 / 光速（物理信号传播耗时）
         return task_size / bandwidth + pd# 传输时间（数据量/带宽）+ 传播延迟
 
 
 class FogToFogEnv:
-    """雾到雾计算环境类，模拟多雾节点之间的任务分配和资源管理"""
+    """雾到雾计算环境类，模拟多雾节点协同的任务分配与资源管理场景
+        该类是强化学习智能体的交互接口，负责：
+        1. 管理多个FogNode实例组成的节点网络
+        2. 生成任务并根据智能体动作分配到节点
+        3. 计算任务处理的延迟、能耗等指标
+        4. 基于指标生成奖励信号，引导智能体学习优化策略
+    """
     def __init__(self, num_fog_nodes=6, arrival_rate=3 * 10**3, task_execution_rate=2.0):
-        self.num_fog_nodes = num_fog_nodes# 雾节点数量
-        self.arrival_rate = arrival_rate  # 任务到达率（泊松分布参数）
+        self.num_fog_nodes = num_fog_nodes# 雾节点数量（默认6个，对应6个智能体）
+        self.arrival_rate = arrival_rate  # 任务到达率（泊松分布参数，控制任务生成频率）
         self.task_execution_rate = task_execution_rate #任务执行率（单位时间处理任务数）
         # 初始化雾节点列表（参数为初始默认值）
         self.fog_nodes = [FogNode(0, 0, 0, 0, 3.0, 2.0, 4, 0.8, 100, 30, 0.02, 1.0, 0.01, 1.0, 1) for _ in range(num_fog_nodes)]
-        self.task_counter = 0# 任务计数器
-        self.result_ratio = 0.1# 任务结果数据量与原任务的比例
+        self.task_counter = 0# 任务计数器（记录总处理任务数）
+        self.result_ratio = 0.1# 任务结果数据量与原任务的比例（影响反馈数据传输）
         self.state = self._generate_initial_state() # 初始状态
-        # 评估指标的最大值（用于归一化）
+        # 评估指标的最大值（用于归一化，避免数值范围波动过大）
         self.max_latency = 100  # 最大延迟阈值（占位符）
         self.max_energy = 10  # 最大能量消耗阈值（占位符）
         self.max_successful_tasks = 10   #最大成功任务数阈值（占位符）
@@ -91,6 +100,7 @@ class FogToFogEnv:
 
     def _generate_initial_state(self):
         """生成环境初始状态，包含每个雾节点的12个特征"""
+        # 状态特征涵盖节点的通信状态、资源能力、任务属性等，是智能体决策的输入依据
         # 生成各特征的随机初始值（基于正态分布或离散选择）
         self.S_channel = np.random.choice([0, 1], size=(self.num_fog_nodes,)) # 信道状态（0/1）
         self.S_power = np.random.normal(3.0, 0.5, size=(self.num_fog_nodes,))# 功率
@@ -164,6 +174,7 @@ class FogToFogEnv:
         # 处理动作：裁剪到[0,1]范围，归一化得到卸载概率
         actions = np.clip(np.array(actions).flatten(), 0, 1)
         action_sum = np.sum(actions)
+        # 若动作和为0，则平均分配概率；否则归一化
         offloading_probabilities = actions / action_sum if action_sum > 0 else np.ones_like(actions) / len(actions)
         # 初始化评估指标
         total_latency, total_energy, successful_tasks = 0, 0, 0
